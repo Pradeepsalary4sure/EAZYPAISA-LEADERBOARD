@@ -1,0 +1,10 @@
+{
+  "name": "eazypaisa-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd vite-project && npm run dev",
+    "build": "cd vite-project && npm run build",
+    "preview": "cd vite-project && npm run preview"
+  }
+}
