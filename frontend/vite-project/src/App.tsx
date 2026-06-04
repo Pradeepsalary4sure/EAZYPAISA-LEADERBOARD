@@ -3,6 +3,7 @@ import heroImage from "./assets/image.png";
 import bankLogo from "./assets/eazypaisa.png";
 import axios from "axios";
 import { useEffect, useState } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:3000"
@@ -469,6 +470,7 @@ const showRepeat =
           </div>
         </main>
       </div>
+      <SpeedInsights />
     </div>
   );
 
