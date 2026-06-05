@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:3000"
-  : "https://leaderboad-backend.onrender.com";
+  : "https://eazypaisa-leaderboard.onrender.com";
   
 const MIN_DISBURSE_DATE = "2025-10-25";
 const MAX_DISBURSE_DATE = "2030-12-31";
