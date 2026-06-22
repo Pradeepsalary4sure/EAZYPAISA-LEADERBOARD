@@ -310,6 +310,173 @@ p {
   flex-wrap: wrap;
 }
 
+.achievement-section {
+  width: 100%;
+  margin: 0 0 34px;
+  padding: 24px;
+  border-radius: 26px;
+  background: linear-gradient(135deg, rgba(240, 253, 250, 0.96), rgba(224, 242, 254, 0.96));
+  border: 2px solid rgba(14, 165, 233, 0.45);
+  box-shadow: 0 24px 70px rgba(14, 165, 233, 0.12);
+}
+
+.achievement-section h2 {
+  color: #001d5a;
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 22px;
+}
+
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.target-card {
+  padding: 22px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 2px solid rgba(14, 165, 233, 0.45);
+  text-align: left;
+}
+
+.target-card.repeat-target {
+  border-color: rgba(16, 185, 129, 0.55);
+}
+
+.target-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.target-card-header h3 {
+  color: #001d5a;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.target-card-header span,
+.total-target-card strong:last-child,
+.received-percent strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(147, 197, 253, 0.45);
+  color: #0b8cff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.target-progress {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dff5ff;
+  border: 1px solid rgba(14, 165, 233, 0.28);
+}
+
+.target-progress div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #10b981);
+}
+
+.target-metrics,
+.total-target-card,
+.amount-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.target-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.target-metrics div,
+.total-target-card > div:not(.target-progress),
+.amount-grid div {
+  min-height: 72px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(239, 248, 255, 0.95);
+  border: 1px solid rgba(125, 211, 252, 0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.target-metrics span,
+.total-target-card span,
+.amount-grid span {
+  color: #005cff;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.target-metrics strong,
+.total-target-card strong,
+.amount-grid strong {
+  color: #001d5a;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.total-target-card {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(224, 242, 254, 0.65);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  margin-bottom: 22px;
+}
+
+.total-target-card .target-progress,
+.amount-summary .target-progress {
+  grid-column: 1 / -1;
+}
+
+.amount-summary {
+  padding: 20px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.72), rgba(209, 250, 229, 0.72));
+  border: 1px solid rgba(14, 165, 233, 0.45);
+}
+
+.amount-summary h2 {
+  margin-bottom: 16px;
+  font-size: 26px;
+}
+
+.amount-grid {
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  margin-bottom: 14px;
+}
+
+.amount-grid .received-percent {
+  border-color: rgba(16, 185, 129, 0.7);
+  background: rgba(240, 253, 250, 0.95);
+}
+
+.received-percent strong {
+  background: transparent;
+  color: #059669;
+}
+
 .date-input {
   width: 100%;
   padding: 14px 18px;
