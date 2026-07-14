@@ -1,264 +1,200 @@
 
-require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
 const Papa = require("papaparse");
+require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
+app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const SHEET_URL = process.env.SHEET_URL;
 
-/*
-  DATE PARSER
-*/
+/* ======================================
+   DATE HELPERS
+====================================== */
 
-function parseDate(dateValue) {
-  if (!dateValue) return null;
-
-  const value = String(dateValue).trim();
-
+function formatDateKey(value) {
   if (!value) return null;
 
-  const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  value = String(value).trim();
 
-  if (isoMatch) {
-    const [, year, month, day] = isoMatch;
-    const date = new Date(
-      Number(year),
-      Number(month) - 1,
-      Number(day)
-    );
-
-    return isNaN(date.getTime()) ? null : date;
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
   }
 
-  const slashMatch = value.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+  // Excel Serial Date
+  if (/^\d+(\.\d+)?$/.test(value)) {
+    const serial = Number(value);
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    const date = new Date(excelEpoch + serial * 86400000);
 
-  if (slashMatch) {
-    const [, first, second, rawYear] = slashMatch;
-    const year =
-      rawYear.length === 2
-        ? Number(`20${rawYear}`)
-        : Number(rawYear);
-    const date = new Date(
-      year,
-      Number(second) - 1,
-      Number(first)
+    return (
+      date.getUTCFullYear() +
+      "-" +
+      String(date.getUTCMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getUTCDate()).padStart(2, "0")
     );
-
-    return isNaN(date.getTime()) ? null : date;
   }
 
-  const serialNumber = Number(value);
-
-  if (!isNaN(serialNumber) && serialNumber > 25569) {
-    const date = new Date(
-      Math.round((serialNumber - 25569) * 86400 * 1000)
-    );
-
-    return isNaN(date.getTime()) ? null : date;
+  // DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
+    const [d, m, y] = value.split("-");
+    return `${y}-${m}-${d}`;
   }
 
-  const date = new Date(value);
-
-  if (!isNaN(date.getTime())) {
-    return date;
+  // DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [d, m, y] = value.split("/");
+    return `${y}-${m}-${d}`;
   }
 
   return null;
 }
 
-function parseDateRangeBoundary(dateValue, isEndDate = false) {
-  const date = parseDate(dateValue);
+function normalizeRange(from, to) {
+  let fromKey = formatDateKey(from);
+  let toKey = formatDateKey(to);
 
-  if (!date) return null;
+  if (fromKey && !toKey) toKey = fromKey;
+  if (!fromKey && toKey) fromKey = toKey;
 
-  if (isEndDate) {
-    date.setHours(23, 59, 59, 999);
-  } else {
-    date.setHours(0, 0, 0, 0);
-  }
-
-  return date;
+  return {
+    fromKey,
+    toKey,
+  };
 }
 
-/*
-  HOME
-*/
+function inRange(dateKey, fromKey, toKey) {
+  if (!dateKey) return false;
+
+  if (fromKey && dateKey < fromKey) return false;
+  if (toKey && dateKey > toKey) return false;
+
+  return true;
+}
+
+/* ======================================
+   ROOT
+====================================== */
 
 app.get("/", (req, res) => {
   res.send("Leaderboard Backend Running");
 });
 
-/*
-  LEADERBOARD API
-*/
+/* ======================================
+   API
+====================================== */
 
 app.get("/api/leaderboard", async (req, res) => {
+
   try {
+
     const selectedMonth = String(
       req.query.month || "all"
     )
       .trim()
       .toLowerCase();
 
-    const fromDate = req.query.fromDate
-      ? parseDateRangeBoundary(req.query.fromDate)
-      : null;
-
-    const toDate = req.query.toDate
-      ? parseDateRangeBoundary(req.query.toDate, true)
-      : null;
-
-    console.log("MONTH =>", selectedMonth);
-    console.log("FROM =>", fromDate);
-    console.log("TO =>", toDate);
-
-    const response = await axios.get(
-      SHEET_URL
+    const { fromKey, toKey } = normalizeRange(
+      req.query.fromDate,
+      req.query.toDate
     );
 
-    const rows = Papa.parse(
-      response.data,
-      {
-        skipEmptyLines: true,
-      }
-    ).data;
+    const hasDateFilter = Boolean(fromKey || toKey);
 
-    let freshMap = {};
-    let repeatMap = {};
+    console.log("MONTH :", selectedMonth);
+    console.log("FROM :", fromKey || "ALL");
+    console.log("TO :", toKey || "ALL");
+
+    const response = await axios.get(SHEET_URL);
+
+    const rows = Papa.parse(response.data, {
+      skipEmptyLines: true
+    }).data;
+
+    const freshMap = {};
+    const repeatMap = {};
+
+    let matchedRows = 0;
+
+    let minDate = null;
+    let maxDate = null;
 
     rows.slice(1).forEach((row) => {
 
-      /*
-        O = Disbursed Date
-        Q = Month Disbursed
-        AB = Type
-        AC = Executive
-      */
+      const caseDate = formatDateKey(row[14]);
 
-      const disbursedDate =
-        parseDate(row[14]);
+      if (caseDate) {
 
-      const rowMonth = String(
-        row[16] || ""
-      )
+        if (!minDate || caseDate < minDate)
+          minDate = caseDate;
+
+        if (!maxDate || caseDate > maxDate)
+          maxDate = caseDate;
+      }
+
+      // DATE FILTER
+
+      if (hasDateFilter) {
+
+        if (!inRange(caseDate, fromKey, toKey))
+          return;
+
+      }
+
+      // MONTH FILTER
+
+      const rowMonth = String(row[16] || "")
         .trim()
         .toLowerCase();
 
-      /*
-        MONTH FILTER
-      */
+      if (!hasDateFilter && selectedMonth !== "all") {
 
-      if (selectedMonth !== "all") {
+        const m1 = selectedMonth.replace(/['\s-]/g, "");
+        const m2 = rowMonth.replace(/['\s-]/g, "");
 
-        const selected =
-          selectedMonth
-            .replace(/['\s-]/g, "")
-            .toLowerCase();
-
-        const currentMonth =
-          rowMonth
-            .replace(/['\s-]/g, "")
-            .toLowerCase();
-
-        if (
-          currentMonth !== selected
-        ) {
+        if (!m2.startsWith(m1))
           return;
-        }
       }
-
-      /*
-        DATE FILTER
-      */
-
-      if (
-        fromDate ||
-        toDate
-      ) {
-
-        if (!disbursedDate)
-          return;
-
-        if (
-          fromDate &&
-          disbursedDate <
-            fromDate
-        ) {
-          return;
-        }
-
-        if (
-          toDate &&
-          disbursedDate >
-            toDate
-        ) {
-          return;
-        }
-      }
-
-      /*
-        AMOUNTS
-      */
 
       const amount =
         Number(
-          String(
-            row[4] || ""
-          ).replace(
-            /[^0-9.]/g,
-            ""
-          )
+          String(row[4] || "")
+            .replace(/[^0-9.]/g, "")
         ) || 0;
 
-      const actualRepayAmount =
+      const repayAmount =
         Number(
-          String(
-            row[49] || ""
-          ).replace(
-            /[^0-9.]/g,
-            ""
-          )
+          String(row[13] || "")
+            .replace(/[^0-9.]/g, "")
         ) || 0;
 
       const receivedAmount =
         Number(
-          String(
-            row[21] || ""
-          ).replace(
-            /[^0-9.]/g,
-            ""
-          )
+          String(row[21] || "")
+            .replace(/[^0-9.]/g, "")
         ) || 0;
 
-      /*
-        TYPE
-      */
+      const type =
+        String(row[27] || "")
+          .trim()
+          .toLowerCase();
 
-      const type = String(
-        row[27] || ""
-      )
-        .trim()
-        .toLowerCase();
+      const executive =
+        String(row[28] || "")
+          .trim();
 
-      /*
-        EXECUTIVE
-      */
+      if (!executive)
+        return;
 
-      const executive = String(
-        row[28] || ""
-      ).trim();
-
-      if (!executive) return;
-
-      const key =
-        executive.toLowerCase();
+      const key = executive.toLowerCase();
 
       const isFresh =
         type.includes("fresh") ||
@@ -274,99 +210,103 @@ app.get("/api/leaderboard", async (req, res) => {
           ? repeatMap
           : null;
 
-      if (!target) return;
+      if (!target)
+        return;
+
+      matchedRows++;
 
       if (!target[key]) {
 
         target[key] = {
+
           name: executive,
           cases: 0,
           amount: 0,
-          actualRepayAmount: 0,
-          receivedAmount: 0,
+          repayAmount: 0,
+          receivedAmount: 0
+
         };
 
       }
 
-      target[key].cases += 1;
-
+      target[key].cases++;
       target[key].amount += amount;
+      target[key].repayAmount += repayAmount;
+      target[key].receivedAmount += receivedAmount;
 
-      target[key].actualRepayAmount +=
-        actualRepayAmount;
-
-      target[key].receivedAmount +=
-        receivedAmount;
     });
 
-    /*
-      FINAL DATA
-    */
+    const fresh = Object.values(freshMap)
+    .map((item) => ({
+      ...item,
+      receivePercent:
+        item.repayAmount > 0
+          ? Number(
+              (
+                (item.receivedAmount / item.repayAmount) *
+                100
+              ).toFixed(2)
+            )
+          : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
 
-    const fresh = Object.values(
-      freshMap
-    )
-      .map((item) => ({
-        ...item,
-        receivePercent:
-          item.actualRepayAmount >
-          0
-            ? Number(
-                (
-                  (item.receivedAmount /
-                    item.actualRepayAmount) *
-                  100
-                ).toFixed(2)
-              )
-            : 0,
-      }))
-      .sort(
-        (a, b) =>
-          b.amount - a.amount
-      );
+  const repeat = Object.values(repeatMap)
+    .map((item) => ({
+      ...item,
+      receivePercent:
+        item.repayAmount > 0
+          ? Number(
+              (
+                (item.receivedAmount / item.repayAmount) *
+                100
+              ).toFixed(2)
+            )
+          : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
 
-    const repeat = Object.values(
-      repeatMap
-    )
-      .map((item) => ({
-        ...item,
-        receivePercent:
-          item.actualRepayAmount >
-          0
-            ? Number(
-                (
-                  (item.receivedAmount /
-                    item.actualRepayAmount) *
-                  100
-                ).toFixed(2)
-              )
-            : 0,
-      }))
-      .sort(
-        (a, b) =>
-          b.amount - a.amount
-      );
+  console.log("Matched Rows :", matchedRows);
 
-    res.json({
-      fresh,
-      repeat,
-    });
+  res.json({
+    success: true,
 
-  } catch (err) {
+    filters: {
+      month: selectedMonth,
+      fromDate: fromKey,
+      toDate: toKey,
+    },
 
-    console.error(
-      "SERVER ERROR =>",
-      err
-    );
+    sheetRange: {
+      min: minDate,
+      max: maxDate,
+    },
 
-    res.status(500).json({
-      error: err.message,
-    });
-  }
+    summary: {
+      freshExecutives: fresh.length,
+      repeatExecutives: repeat.length,
+      matchedRows,
+    },
+
+    fresh,
+    repeat,
+  });
+
+} catch (err) {
+
+  console.error("SERVER ERROR =>", err);
+
+  res.status(500).json({
+    success: false,
+    message: err.message,
+  });
+
+}
+
 });
 
 app.listen(PORT, () => {
-  console.log(
-    `Server Running On ${PORT}`
-  );
+
+console.log(`Server Running On ${PORT}`);
+
 });
