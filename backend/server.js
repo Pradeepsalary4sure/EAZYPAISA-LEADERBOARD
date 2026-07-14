@@ -1,4 +1,5 @@
 ﻿// require("dotenv").config();
+
 // const express = require("express");
 // const cors = require("cors");
 // const axios = require("axios");
@@ -8,157 +9,299 @@
 
 // app.use(cors());
 
-// const PORT = process.env.PORT || 3000;
+// const PORT = process.env.PORT || 5000;
 // const SHEET_URL = process.env.SHEET_URL;
 
-// function parseDateValue(dateValue) {
+// /*
+//   DATE PARSER
+// */
+
+// function parseDate(dateValue) {
 //   if (!dateValue) return null;
 
 //   const value = String(dateValue).trim();
 
-//   if (/^\d+(\.\d+)?$/.test(value)) {
-//     const serial = Number(value);
-//     const excelEpoch = Date.UTC(1899, 11, 30);
-//     const date = new Date(excelEpoch + serial * 24 * 60 * 60 * 1000);
-//     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+//   const date = new Date(value);
+
+//   if (!isNaN(date.getTime())) {
+//     return date;
 //   }
 
-//   const parts = value.split(/[/-]/);
-
-//   if (parts.length !== 3) return null;
-
-//   const [first, second, third] = parts.map(Number);
-
-//   if ([first, second, third].some(Number.isNaN)) {
-//     return null;
-//   }
-
-//   if (String(parts[0]).length === 4) {
-//     return new Date(first, second - 1, third);
-//   }
-
-//   return new Date(third, second - 1, first);
+//   return null;
 // }
 
-// function endOfDay(date) {
-//   const result = new Date(date);
-//   result.setHours(23, 59, 59, 999);
-//   return result;
-// }
+// /*
+//   HOME
+// */
 
 // app.get("/", (req, res) => {
 //   res.send("Leaderboard Backend Running");
 // });
 
+// /*
+//   LEADERBOARD API
+// */
+
 // app.get("/api/leaderboard", async (req, res) => {
 //   try {
-//     const selectedMonth = String(req.query.month || "all").trim().toLowerCase();
-//     const fromDate = parseDateValue(req.query.fromDate);
-//     const toDate = parseDateValue(req.query.toDate);
+//     const selectedMonth = String(
+//       req.query.month || "all"
+//     )
+//       .trim()
+//       .toLowerCase();
+
+//     const fromDate = req.query.fromDate
+//       ? new Date(req.query.fromDate)
+//       : null;
+
+//     const toDate = req.query.toDate
+//       ? new Date(req.query.toDate)
+//       : null;
 
 //     console.log("MONTH =>", selectedMonth);
-//     console.log("FROM =>", req.query.fromDate || "all");
-//     console.log("TO =>", req.query.toDate || "all");
+//     console.log("FROM =>", fromDate);
+//     console.log("TO =>", toDate);
 
-//     const response = await axios.get(SHEET_URL);
+//     const response = await axios.get(
+//       SHEET_URL
+//     );
 
-//     const rows = Papa.parse(response.data, {
-//       skipEmptyLines: true,
-//     }).data;
+//     const rows = Papa.parse(
+//       response.data,
+//       {
+//         skipEmptyLines: true,
+//       }
+//     ).data;
 
-//     const freshMap = {};
-//     const repeatMap = {};
+//     let freshMap = {};
+//     let repeatMap = {};
 
 //     rows.slice(1).forEach((row) => {
-//       const caseDate = parseDateValue(row[14]);
 
-//       if (fromDate || toDate) {
+//       /*
+//         O = Disbursed Date
+//         Q = Month Disbursed
+//         AB = Type
+//         AC = Executive
+//       */
+
+//       const disbursedDate =
+//         parseDate(row[14]);
+
+//       const rowMonth = String(
+//         row[16] || ""
+//       )
+//         .trim()
+//         .toLowerCase();
+
+//       /*
+//         MONTH FILTER
+//       */
+
+//       if (selectedMonth !== "all") {
+
+//         const selected =
+//           selectedMonth
+//             .replace(/['\s-]/g, "")
+//             .toLowerCase();
+
+//         const currentMonth =
+//           rowMonth
+//             .replace(/['\s-]/g, "")
+//             .toLowerCase();
+
 //         if (
-//           !caseDate ||
-//           (fromDate && caseDate < fromDate) ||
-//           (toDate && caseDate > endOfDay(toDate))
+//           currentMonth !== selected
 //         ) {
 //           return;
 //         }
 //       }
 
-//       const rowMonth = String(row[16] || "").trim().toLowerCase();
+//       /*
+//         DATE FILTER
+//       */
 
-//       if (selectedMonth !== "all") {
-//         const selected = selectedMonth.replace(/['\s-]/g, "");
-//         const month = rowMonth.replace(/['\s-]/g, "");
+//       if (
+//         fromDate ||
+//         toDate
+//       ) {
 
-//         if (!month.startsWith(selected)) {
+//         if (!disbursedDate)
+//           return;
+
+//         if (
+//           fromDate &&
+//           disbursedDate <
+//             fromDate
+//         ) {
+//           return;
+//         }
+
+//         if (
+//           toDate &&
+//           disbursedDate >
+//             toDate
+//         ) {
 //           return;
 //         }
 //       }
 
+//       /*
+//         AMOUNTS
+//       */
+
 //       const amount =
-//         Number(String(row[4] || "").replace(/[^0-9.]/g, "")) || 0;
+//         Number(
+//           String(
+//             row[4] || ""
+//           ).replace(
+//             /[^0-9.]/g,
+//             ""
+//           )
+//         ) || 0;
 
 //       const actualRepayAmount =
-//         Number(String(row[49] || "").replace(/[^0-9.]/g, "")) || 0;
+//         Number(
+//           String(
+//             row[49] || ""
+//           ).replace(
+//             /[^0-9.]/g,
+//             ""
+//           )
+//         ) || 0;
 
 //       const receivedAmount =
-//         Number(String(row[21] || "").replace(/[^0-9.]/g, "")) || 0;
+//         Number(
+//           String(
+//             row[21] || ""
+//           ).replace(
+//             /[^0-9.]/g,
+//             ""
+//           )
+//         ) || 0;
 
-//       const type = String(row[27] || "").trim().toLowerCase();
-//       const executive = String(row[28] || "").trim();
-//       const month = String(row[16] || "").trim();
+//       /*
+//         TYPE
+//       */
+
+//       const type = String(
+//         row[27] || ""
+//       )
+//         .trim()
+//         .toLowerCase();
+
+//       /*
+//         EXECUTIVE
+//       */
+
+//       const executive = String(
+//         row[28] || ""
+//       ).trim();
 
 //       if (!executive) return;
 
-//       const normalizedMonth = month || "All";
-//       const key = `${executive.toLowerCase()}|${normalizedMonth.toLowerCase()}`;
-//       const isFresh = type.includes("fresh") || type.includes("new");
-//       const isRepeat = type.includes("repeat");
-//       const target = isFresh ? freshMap : isRepeat ? repeatMap : null;
+//       const key =
+//         executive.toLowerCase();
+
+//       const isFresh =
+//         type.includes("fresh") ||
+//         type.includes("new");
+
+//       const isRepeat =
+//         type.includes("repeat");
+
+//       const target =
+//         isFresh
+//           ? freshMap
+//           : isRepeat
+//           ? repeatMap
+//           : null;
 
 //       if (!target) return;
 
 //       if (!target[key]) {
+
 //         target[key] = {
 //           name: executive,
-//           month: normalizedMonth,
 //           cases: 0,
 //           amount: 0,
 //           actualRepayAmount: 0,
 //           receivedAmount: 0,
 //         };
+
 //       }
 
 //       target[key].cases += 1;
+
 //       target[key].amount += amount;
-//       target[key].actualRepayAmount += actualRepayAmount;
-//       target[key].receivedAmount += receivedAmount;
+
+//       target[key].actualRepayAmount +=
+//         actualRepayAmount;
+
+//       target[key].receivedAmount +=
+//         receivedAmount;
 //     });
 
-//     const fresh = Object.values(freshMap)
-//       .map((item) => ({
-//         ...item,
-//         receivePercent:
-//           item.actualRepayAmount > 0
-//             ? Number(((item.receivedAmount / item.actualRepayAmount) * 100).toFixed(2))
-//             : 0,
-//       }))
-//       .sort((a, b) => b.amount - a.amount);
+//     /*
+//       FINAL DATA
+//     */
 
-//     const repeat = Object.values(repeatMap)
+//     const fresh = Object.values(
+//       freshMap
+//     )
 //       .map((item) => ({
 //         ...item,
 //         receivePercent:
-//           item.actualRepayAmount > 0
-//             ? Number(((item.receivedAmount / item.actualRepayAmount) * 100).toFixed(2))
+//           item.actualRepayAmount >
+//           0
+//             ? Number(
+//                 (
+//                   (item.receivedAmount /
+//                     item.actualRepayAmount) *
+//                   100
+//                 ).toFixed(2)
+//               )
 //             : 0,
 //       }))
-//       .sort((a, b) => b.amount - a.amount);
+//       .sort(
+//         (a, b) =>
+//           b.amount - a.amount
+//       );
+
+//     const repeat = Object.values(
+//       repeatMap
+//     )
+//       .map((item) => ({
+//         ...item,
+//         receivePercent:
+//           item.actualRepayAmount >
+//           0
+//             ? Number(
+//                 (
+//                   (item.receivedAmount /
+//                     item.actualRepayAmount) *
+//                   100
+//                 ).toFixed(2)
+//               )
+//             : 0,
+//       }))
+//       .sort(
+//         (a, b) =>
+//           b.amount - a.amount
+//       );
 
 //     res.json({
 //       fresh,
 //       repeat,
 //     });
+
 //   } catch (err) {
-//     console.error("SERVER ERROR =>", err);
+
+//     console.error(
+//       "SERVER ERROR =>",
+//       err
+//     );
+
 //     res.status(500).json({
 //       error: err.message,
 //     });
@@ -166,10 +309,10 @@
 // });
 
 // app.listen(PORT, () => {
-//   console.log(`Server Running On ${PORT}`);
+//   console.log(
+//     `Server Running On ${PORT}`
+//   );
 // });
-
-
 
 
 
@@ -196,6 +339,48 @@ function parseDate(dateValue) {
 
   const value = String(dateValue).trim();
 
+  if (!value) return null;
+
+  const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    const date = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day)
+    );
+
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  const slashMatch = value.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+
+  if (slashMatch) {
+    const [, first, second, rawYear] = slashMatch;
+    const year =
+      rawYear.length === 2
+        ? Number(`20${rawYear}`)
+        : Number(rawYear);
+    const date = new Date(
+      year,
+      Number(second) - 1,
+      Number(first)
+    );
+
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  const serialNumber = Number(value);
+
+  if (!isNaN(serialNumber) && serialNumber > 25569) {
+    const date = new Date(
+      Math.round((serialNumber - 25569) * 86400 * 1000)
+    );
+
+    return isNaN(date.getTime()) ? null : date;
+  }
+
   const date = new Date(value);
 
   if (!isNaN(date.getTime())) {
@@ -203,6 +388,20 @@ function parseDate(dateValue) {
   }
 
   return null;
+}
+
+function parseDateRangeBoundary(dateValue, isEndDate = false) {
+  const date = parseDate(dateValue);
+
+  if (!date) return null;
+
+  if (isEndDate) {
+    date.setHours(23, 59, 59, 999);
+  } else {
+    date.setHours(0, 0, 0, 0);
+  }
+
+  return date;
 }
 
 /*
@@ -226,11 +425,11 @@ app.get("/api/leaderboard", async (req, res) => {
       .toLowerCase();
 
     const fromDate = req.query.fromDate
-      ? new Date(req.query.fromDate)
+      ? parseDateRangeBoundary(req.query.fromDate)
       : null;
 
     const toDate = req.query.toDate
-      ? new Date(req.query.toDate)
+      ? parseDateRangeBoundary(req.query.toDate, true)
       : null;
 
     console.log("MONTH =>", selectedMonth);
